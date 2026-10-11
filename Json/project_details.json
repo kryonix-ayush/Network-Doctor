@@ -1,0 +1,899 @@
+{
+  "project": {
+    "name": "Network Doctor",
+    "description": "A local-plus-cloud HTTPS service monitoring and network diagnostics platform.",
+    "version": "1.0.0",
+    "project_root": "D:/Ayush/Project/py",
+    "generated_at": "2026-10-09T20:04:49+05:30",
+    "purpose": [
+      "Run network diagnostics from a Windows/local agent and an independent cloud agent.",
+      "Persist diagnostic history locally and centrally.",
+      "Correlate observations, track incidents, and expose status through an authenticated API and dashboard."
+    ],
+    "authorized_use": "Only configure services that the operator owns or is explicitly authorized to monitor."
+  },
+  "technology": {
+    "language": "Python",
+    "minimum_python_version": "3.12",
+    "http_client": "httpx",
+    "dns_library": "dnspython",
+    "api_framework": "FastAPI",
+    "dashboard_framework": "Streamlit",
+    "dashboard_data": "pandas",
+    "default_database": "SQLite",
+    "optional_central_database": "PostgreSQL via psycopg",
+    "configuration": "Environment variables and python-dotenv",
+    "deployment": [
+      "Docker Compose",
+      "Caddy HTTPS reverse proxy",
+      "PostgreSQL"
+    ]
+  },
+  "architecture": {
+    "topology": "The local agent performs checks and persists results independently of cloud/API availability. It queues result deliveries in a durable local outbox. A separately hosted cloud agent probes configured targets from another network location, keeps its own durable local SQLite state, and sends authenticated measurements to the API.",
+    "components": [
+      {
+        "name": "Local diagnostic CLI",
+        "entry_point": "network_doctor.py",
+        "responsibility": "Run a one-off diagnostic against a validated HTTPS URL."
+      },
+      {
+        "name": "Local monitoring agent",
+        "entry_point": "agents.local_agent",
+        "responsibility": "Periodically run checks, save history, manage incidents locally, and asynchronously enqueue authenticated API deliveries."
+      },
+      {
+        "name": "Cloud monitoring agent",
+        "entry_point": "agents.cloud_agent",
+        "responsibility": "Fetch authorized targets and policy from the API, probe them with cloud destination protections, save results locally, and submit results through the durable outbox."
+      },
+      {
+        "name": "Backend API",
+        "entry_point": "backend.main:app",
+        "responsibility": "Authenticate dashboard and agent requests, authorize targets, persist and correlate results, maintain agent health and incidents, and manage monitoring configuration."
+      },
+      {
+        "name": "Dashboard",
+        "entry_point": "dashboard/app.py",
+        "responsibility": "Display status, local/cloud observations, performance history, incidents, targets, monitoring policy, and evidence-based recommended solutions."
+      },
+      {
+        "name": "Notification dispatcher",
+        "entry_point": "notifications.dispatcher",
+        "responsibility": "Send incident transition notifications over configured Telegram and/or email channels with deduplication and bounded retries."
+      }
+    ],
+    "measurement_flow": [
+      "Validate an HTTPS target URL.",
+      "Run DNS and HTTPS checks; when DNS succeeds, run TCP and TLS certificate checks using resolved addresses.",
+      "Persist local measurements and create stable-ID outbox records where agent delivery is configured.",
+      "Deliver agent result batches to the API; retry transient failures with bounded exponential backoff.",
+      "The API validates the agent identity and enabled target, stores result IDs idempotently, correlates observations, and updates incident state.",
+      "The dashboard reads API status and history; incident transitions may trigger configured notifications."
+    ]
+  },
+  "source_layout": [
+    {
+      "path": "network_doctor.py",
+      "purpose": "One-off diagnostics CLI, output formatting, timeout flags, optional ping/traceroute flags, and exit status."
+    },
+    {
+      "path": "network_doctor_history.py",
+      "purpose": "Read and display recent diagnostic history from a local database."
+    },
+    {
+      "path": "checks/",
+      "files": [
+        "models.py",
+        "url_validation.py",
+        "dns_check.py",
+        "tcp_check.py",
+        "https_check.py",
+        "tls_check.py",
+        "cloud_probe.py",
+        "ping_check.py",
+        "traceroute_check.py",
+        "runner.py"
+      ],
+      "purpose": "Typed diagnostic outcomes, URL validation, DNS/TCP/HTTPS/TLS checks, cloud-specific SSRF protections, optional route diagnostics, and check orchestration."
+    },
+    {
+      "path": "agents/",
+      "files": [
+        "local_agent.py",
+        "cloud_agent.py",
+        "scheduler.py",
+        "outbox.py"
+      ],
+      "purpose": "Local and cloud monitoring loops, scheduling, heartbeats, durable results delivery, retry, and runtime settings refresh."
+    },
+    {
+      "path": "backend/",
+      "files": [
+        "main.py",
+        "auth.py",
+        "schemas.py"
+      ],
+      "purpose": "FastAPI endpoints, bearer authentication, rate/body-size guards, request validation, result ingestion, target management, and incident/settings APIs."
+    },
+    {
+      "path": "dashboard/",
+      "files": [
+        "app.py",
+        "api_client.py"
+      ],
+      "purpose": "Streamlit user interface and authenticated API client."
+    },
+    {
+      "path": "diagnosis/",
+      "files": [
+        "rules.py",
+        "incident_manager.py",
+          "correlator.py",
+          "remediation.py"
+        ],
+        "purpose": "Evidence-based rule diagnoses, local/cloud result correlation, incident thresholds, transitions, recovery, and safe recommendation guidance."
+      },    {
+      "path": "storage/",
+      "files": [
+        "repository.py",
+        "models.py"
+      ],
+      "purpose": "SQLite persistence and PostgreSQL connection adapter for results, targets, agents, incidents, notification state, settings, and delivery outbox."
+    },
+    {
+      "path": "notifications/",
+      "files": [
+        "dispatcher.py",
+        "telegram.py",
+        "email.py"
+      ],
+      "purpose": "Optional notification channel integrations with persisted delivery state."
+    },
+    {
+      "path": "config/",
+      "files": [
+        "settings.py",
+        "logging_config.py"
+      ],
+      "purpose": "Environment-driven settings validation and structured JSON logging."
+    },
+    {
+      "path": "tests/",
+      "files": [
+        "test_url_validation.py",
+        "test_checks.py",
+        "test_scheduler.py",
+        "test_diagnosis.py",
+        "test_notifications.py",
+        "test_api.py",
+        "test_cloud_security.py",
+        "test_outbox.py",
+        "test_dashboard_api_client.py"
+      ],
+      "purpose": "Unit, API, scheduler, persistence, notification, authentication, outbox, and cloud security tests."
+    },
+    {
+      "path": "Json/project_details.json",
+      "purpose": "Structured project reference and configuration overview."
+    }
+  ],
+  "diagnostics": {
+    "required_checks": [
+      {
+        "name": "DNS",
+        "check_type": "dns",
+        "default_timeout_seconds": 2,
+        "description": "Resolve the target hostname and record returned addresses."
+      },
+      {
+        "name": "TCP",
+        "check_type": "tcp",
+        "default_timeout_seconds": 3,
+        "description": "Test connectivity to the target port using addresses from the DNS check."
+      },
+      {
+        "name": "HTTPS",
+        "check_type": "https",
+        "default_timeout_seconds": 5,
+        "description": "Make an HTTPS request without following redirects; classify status and transport outcomes."
+      },
+      {
+        "name": "TLS certificate",
+        "check_type": "tls_certificate",
+        "default_timeout_seconds": 5,
+        "description": "Perform TLS handshake and certificate/hostname verification with the platform trust store."
+      }
+    ],
+    "optional_checks": [
+      {
+        "name": "ICMP ping",
+        "check_type": "icmp_ping",
+        "activation": "CLI --ping option",
+        "notes": "Uses the system ping program; ICMP failure does not by itself determine HTTPS availability."
+      },
+      {
+        "name": "Traceroute",
+        "check_type": "traceroute",
+        "activation": "CLI --traceroute option",
+        "notes": "Invokes the platform utility with a bounded timeout and hop count."
+      }
+    ],
+    "url_policy": {
+      "scheme": "HTTPS only",
+      "url_credentials": "Rejected",
+      "redirects": "Not followed",
+      "query_string_logging": "Redacted from logs and notifications"
+    },
+    "success_semantics": "The overall report's availability outcome is based on HTTPS; auxiliary checks such as ICMP do not override it."
+  },
+  "evidence_based_troubleshooting": {
+    "status": "implemented",
+    "module": "diagnosis/remediation.py",
+    "goal": "Translate diagnostic evidence into read-only, ordered, confidence-scored troubleshooting guidance without altering existing monitoring behavior.",
+    "safety_contracts": [
+      "Recommendations are always evidence-based and never claim a root cause without supporting checks.",
+      "No automatic remediation or configuration changes are performed by the recommendation layer.",
+      "TLS guidance explicitly avoids disabling validation, skipping hostname checks, or trusting invalid certificates.",
+      "ICMP-only failure is treated as secondary information unless HTTPS evidence confirms a broader service issue."
+    ],
+    "supported_diagnosis_categories": [
+      "DNS failures and local-vs-cloud DNS disagreement",
+      "TCP connectivity failures",
+      "TLS certificate and hostname validation failures",
+      "HTTPS server errors and request failures",
+      "ICMP-blocked-but-HTTPS-available scenarios",
+      "Single-target failures from both locations",
+      "Local connectivity or policy disagreements",
+      "Stale agent detection and heartbeat troubleshooting",
+      "Insufficient-evidence fallback guidance"
+    ],
+    "dashboard_integration": {
+      "display": "Compact recommendation panels appear in the overview dashboard for each target when actionable evidence is available.",
+      "preserved_behavior": "The existing status tables, history charts, incidents, and policy views remain unchanged in structure and API behavior."
+    }
+  },
+  "api": {
+    "base_path": "/api/v1",
+    "authentication": {
+      "scheme": "HTTP bearer tokens",
+      "dashboard_and_administration": "API_TOKEN",
+      "agents": "Agent-specific AGENT_TOKENS JSON mapping agent ID to a distinct secret; identity is checked against the token.",
+      "minimum_secret_length": 32
+    },
+    "endpoints": [
+      {
+        "method": "GET",
+        "path": "/health",
+        "access": "Unauthenticated",
+        "purpose": "Liveness check."
+      },
+      {
+        "method": "GET",
+        "path": "/ready",
+        "access": "Unauthenticated",
+        "purpose": "Readiness check including storage access."
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/agents/heartbeat",
+        "access": "Agent bearer token",
+        "purpose": "Record agent identity/version/heartbeat and resolve stale-agent incident when applicable."
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/results/batch",
+        "access": "Agent bearer token",
+        "purpose": "Validate and persist idempotent measurement results, correlate observations, and update incidents."
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/targets",
+        "access": "API or agent bearer token",
+        "purpose": "List configured targets."
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/targets",
+        "access": "API bearer token",
+        "purpose": "Create or update an authorized HTTPS monitoring target."
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/v1/targets/{target_id}?enabled={boolean}",
+        "access": "API bearer token",
+        "purpose": "Enable or disable a configured target."
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/status",
+        "access": "API bearer token",
+        "purpose": "Read latest per-target and per-agent observations."
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/agents",
+        "access": "API bearer token",
+        "purpose": "List agent heartbeats and health status."
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/history",
+        "access": "API bearer token",
+        "purpose": "Read recent results with optional target URL filter."
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/incidents",
+        "access": "API bearer token",
+        "purpose": "List incidents and notification delivery status; supports active_only."
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/incidents/{incident_id}/acknowledge",
+        "access": "API bearer token",
+        "purpose": "Acknowledge an incident."
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/settings",
+        "access": "API or agent bearer token",
+        "purpose": "Read monitoring policy."
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/v1/settings",
+        "access": "API bearer token",
+        "purpose": "Update validated monitoring policy."
+      }
+    ],
+    "request_limits": {
+      "default_rate_limit_per_client_per_minute": 120,
+      "default_max_request_body_bytes": 1048576,
+      "maximum_result_batch_size": 500,
+      "history_limit_max": 5000,
+      "strict_schema": "Unexpected request fields are rejected."
+    }
+  },
+  "configuration": {
+    "source": ".env.example",
+    "secrets_policy": "The example file contains placeholders only. Copy it to .env, replace placeholders with unique random secrets, and do not commit .env.",
+    "variables": [
+      {
+        "name": "API_TOKEN",
+        "purpose": "Dashboard/administration API bearer secret.",
+        "default_or_example": "Placeholder; replace with at least 32 random characters."
+      },
+      {
+        "name": "LOCAL_AGENT_TOKEN",
+        "purpose": "Example distinct credential for the local agent."
+      },
+      {
+        "name": "CLOUD_AGENT_TOKEN",
+        "purpose": "Example distinct credential for the cloud agent."
+      },
+      {
+        "name": "AGENT_TOKENS",
+        "purpose": "JSON object mapping network-doctor-local and network-doctor-cloud IDs to their distinct bearer secrets."
+      },
+      {
+        "name": "POSTGRES_PASSWORD",
+        "purpose": "PostgreSQL password; example recommends a URL-safe hexadecimal secret."
+      },
+      {
+        "name": "DATABASE_URL",
+        "purpose": "Optional PostgreSQL connection string; unset/empty uses SQLite."
+      },
+      {
+        "name": "DATABASE_PATH",
+        "default": "network_doctor.sqlite3",
+        "purpose": "SQLite database file path."
+      },
+      {
+        "name": "NETWORK_DOCTOR_DOMAIN",
+        "purpose": "Public DNS name used by Caddy and cloud agent HTTPS API URL."
+      },
+      {
+        "name": "API_BASE_URL",
+        "default": "http://127.0.0.1:8000",
+        "purpose": "API URL; HTTP is allowed only for loopback and cloud agents require HTTPS."
+      },
+      {
+        "name": "MONITOR_INTERVAL_SECONDS",
+        "default": 10
+      },
+      {
+        "name": "DNS_TIMEOUT_SECONDS",
+        "default": 2
+      },
+      {
+        "name": "TCP_TIMEOUT_SECONDS",
+        "default": 3
+      },
+      {
+        "name": "HTTP_TIMEOUT_SECONDS",
+        "default": 5
+      },
+      {
+        "name": "FAILURES_TO_OPEN_INCIDENT",
+        "default": 3
+      },
+      {
+        "name": "SUCCESSES_TO_RESOLVE_INCIDENT",
+        "default": 2
+      },
+      {
+        "name": "AGENT_HEARTBEAT_INTERVAL_SECONDS",
+        "default": 30
+      },
+      {
+        "name": "AGENT_STALE_AFTER_SECONDS",
+        "default": 90
+      },
+      {
+        "name": "MAX_CONCURRENT_CHECKS",
+        "default": 20
+      },
+      {
+        "name": "RETENTION_DAYS",
+        "default": 30
+      },
+      {
+        "name": "API_RATE_LIMIT_PER_MINUTE",
+        "default": 120
+      },
+      {
+        "name": "API_MAX_REQUEST_BYTES",
+        "default": 1048576
+      },
+      {
+        "name": "TELEGRAM_BOT_TOKEN",
+        "purpose": "Optional Telegram alert credential."
+      },
+      {
+        "name": "TELEGRAM_CHAT_ID",
+        "purpose": "Optional Telegram destination."
+      },
+      {
+        "name": "SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, ALERT_FROM_EMAIL, ALERT_TO_EMAIL",
+        "purpose": "Optional email alert configuration."
+      },
+      {
+        "name": "ALLOW_PRIVATE_CLOUD_TARGETS",
+        "default": false,
+        "purpose": "Controls whether cloud probes may target non-public IP destinations; keep disabled unless explicitly required."
+      },
+      {
+        "name": "CLOUD_PRIVATE_TARGETS_ACK",
+        "purpose": "Required exact acknowledgement when private cloud targets are enabled."
+      }
+    ]
+  },
+  "security": {
+    "cloud_destination_protection": [
+        "Cloud DNS addresses are rejected if they are not globally routable unless the private-target opt-in is enabled.",
+        "Cloud TCP and HTTPS probes connect directly to validated addresses to reduce DNS-rebinding risk.",
+        "TLS certificate chain and hostname verification remain enabled while connecting to pinned addresses."
+    ],
+    "private_destination_default": "Blocked, including private, loopback, link-local, and metadata IP destinations.",
+    "private_destination_opt_in_acknowledgement": "I understand this allows private cloud probing",
+    "transport": "HTTPS is required for non-loopback API connections; the cloud agent requires HTTPS.",
+    "credentials": [
+      "API and per-agent credentials are separate.",
+      "Agent ID must match the configured per-agent token.",
+      "API URL credentials are rejected.",
+      "Secrets must be kept out of source control and logs."
+    ],
+    "data_handling": [
+      "URL query strings are redacted from logs and notifications.",
+      "Request payload size and request rates are bounded.",
+      "Result IDs provide idempotent ingestion.",
+      "Result history is removed according to retention policy."
+    ]
+  },
+  "persistence": {
+    "default": "SQLite",
+    "postgresql": "Supported by a psycopg adapter for central API deployment; live PostgreSQL deployment requires separate integration validation.",
+    "data_categories": [
+      "Check results and addresses",
+      "Authorized targets and expected HTTP status codes",
+      "Incident counters and incident lifecycle",
+      "Agent identity, heartbeat, version, and status",
+      "Durable result delivery outbox with retry metadata",
+      "Application monitoring settings",
+      "Notification delivery status and deduplication keys"
+    ],
+    "cloud_agent_database": "Persistent SQLite volume in Docker Compose; it is intentionally separate from the API PostgreSQL database."
+  },
+  "notifications": {
+    "channels": [
+      "Telegram, enabled when TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are configured.",
+      "Email, enabled when SMTP_HOST, ALERT_FROM_EMAIL, and ALERT_TO_EMAIL are configured."
+    ],
+    "behavior": [
+      "Incident-opened and incident-resolved transitions can notify.",
+      "Delivery attempts are persisted and deduplicated by incident, event type, and channel.",
+      "Retries are bounded with exponential delay."
+    ]
+  },
+  "deployment": {
+    "local_windows": {
+      "setup": [
+        "py -3.12 -m venv .venv",
+        ".\\.venv\\Scripts\\Activate.ps1",
+        "python -m pip install --upgrade pip",
+        "python -m pip install -r requirements.txt"
+      ],
+      "one_off_check": "python .\\network_doctor.py https://authorized.example/",
+      "local_agent": "python -m agents.local_agent https://authorized.example/",
+      "history": "python .\\network_doctor_history.py --limit 30",
+      "tests": "python -m pytest -q",
+      "api": "python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000",
+      "dashboard": "python -m streamlit run dashboard/app.py"
+    },
+    "docker_compose": {
+      "files": [
+        "Dockerfile",
+        "compose.yaml",
+        "Caddyfile",
+        ".dockerignore"
+      ],
+      "services": [
+        "postgres",
+        "api",
+        "cloud-agent",
+        "dashboard",
+        "proxy"
+      ],
+      "start": "docker compose up --build -d",
+      "status": "docker compose ps",
+      "logs": "docker compose logs -f api cloud-agent",
+      "stop_preserving_data": "docker compose down",
+      "public_network_requirements": [
+        "Configure public DNS for NETWORK_DOCTOR_DOMAIN to point at the host.",
+        "Allow inbound TCP ports 80 and 443 for Caddy certificate provisioning and HTTPS."
+      ],
+      "proxy": "Caddy terminates public TLS and routes /api/*, /health, and /ready to the API; other paths route to Streamlit."
+    }
+  },
+  "runtime_defaults": {
+    "monitor_interval_seconds": 10,
+    "dns_timeout_seconds": 2,
+    "tcp_timeout_seconds": 3,
+    "https_timeout_seconds": 5,
+    "agent_heartbeat_interval_seconds": 30,
+    "agent_stale_after_seconds": 90,
+    "max_concurrent_checks": 20,
+    "failures_to_open_incident": 3,
+    "successes_to_resolve_incident": 2,
+    "retention_days": 30,
+    "api_rate_limit_per_minute": 120,
+    "max_request_bytes": 1048576,
+    "private_cloud_targets_enabled": false
+  },
+  "testing_and_validation": {
+    "test_command": "python -m pytest -q",
+    "coverage_areas": [
+      "URL validation",
+      "DNS/TCP/HTTPS diagnostics",
+      "Scheduler behavior and persistence",
+      "Diagnosis and incident lifecycle",
+      "Evidence-based troubleshooting recommendations and safety constraints",
+      "API authentication, authorization, and result ingestion",
+      "Cloud public/private destination policy",
+      "Durable outbox and retry",
+      "Notification retries and deduplication",
+      "Dashboard API URL validation"
+    ],
+    "most_recent_recorded_suite_result": {
+      "passed": 69,
+      "failed": 0,
+      "notes": "A Starlette/httpx deprecation warning was reported by the test client dependency."
+    },
+    "known_unverified_integration": [
+      "Docker Compose runtime because Docker was unavailable in the implementation environment.",
+      "Actual PostgreSQL server integration; automated database tests use SQLite.",
+      "Public deployment and Caddy certificate issuance require a real public domain and reachable host."
+    ]
+  },
+  "dependencies": [
+    {
+      "package": "httpx",
+      "version_range": ">=0.27,<1.0",
+      "purpose": "Async and synchronous HTTP clients."
+    },
+    {
+      "package": "dnspython",
+      "version_range": ">=2.6,<3.0",
+      "purpose": "DNS resolution."
+    },
+    {
+      "package": "fastapi",
+      "version_range": ">=0.115,<1.0",
+      "purpose": "API framework."
+    },
+    {
+      "package": "uvicorn[standard]",
+      "version_range": ">=0.30,<1.0",
+      "purpose": "ASGI server."
+    },
+    {
+      "package": "streamlit",
+      "version_range": ">=1.39,<2.0",
+      "purpose": "Dashboard."
+    },
+    {
+      "package": "pandas",
+      "version_range": ">=2.2,<3.0",
+      "purpose": "Dashboard charts and tabular data."
+    },
+    {
+      "package": "python-dotenv",
+      "version_range": ">=1.0,<2.0",
+      "purpose": "Load environment configuration from .env."
+    },
+    {
+      "package": "psycopg[binary]",
+      "version_range": ">=3.2,<4.0",
+      "purpose": "Optional PostgreSQL backend."
+    },
+    {
+      "package": "pytest",
+      "version_range": ">=8.0,<9.0",
+      "purpose": "Test runner."
+    },
+    {
+      "package": "pytest-asyncio",
+      "version_range": ">=0.23,<2.0",
+      "purpose": "Async test support."
+    }
+  ],
+  "exit_codes": {
+    "cli_success": 0,
+    "cli_diagnostic_failure": 1,
+    "cli_invalid_url_or_arguments": 2
+  },
+  "ui_addon_instructions": {
+    "document_type": "ai_coding_agent_addon_instructions",
+    "document_version": "1.0.0",
+    "project_name": "Network Doctor",
+    "goal": "Add a user interface that connects to and presents the existing Network Doctor system's terminal/diagnostic output, identifies issues, and displays evidence-based solutions.",
+    "source_reference": {
+      "file": "project_details(1).json",
+      "project_stack": {
+        "language": "Python",
+        "minimum_python_version": "3.12",
+        "http_client": "httpx",
+        "dns_library": "dnspython",
+        "api_framework": "FastAPI",
+        "dashboard_framework": "Streamlit",
+        "dashboard_data": "pandas",
+        "default_database": "SQLite",
+        "optional_central_database": "PostgreSQL via psycopg",
+        "configuration": "Environment variables and python-dotenv",
+        "deployment": [
+          "Docker Compose",
+          "Caddy HTTPS reverse proxy",
+          "PostgreSQL"
+        ]
+      },
+      "dashboard_path_from_project": "dashboard/app.py",
+      "diagnostic_entry_point": "network_doctor.py",
+      "api_entry_point": "backend.main:app",
+      "diagnosis_module": "diagnosis/",
+      "existing_solution_module": "diagnosis/remediation.py"
+    },
+    "absolute_constraints": {
+      "no_existing_project_changes": true,
+      "meaning": "Do not rewrite, refactor, rename, delete, or alter the behavior of existing diagnostics, agents, backend routes, database schemas, security rules, terminal output, monitoring policy, or notification system.",
+      "additive_only": [
+        "Create a separate UI addon in new files only.",
+        "Connect to existing supported interfaces rather than modifying core modules.",
+        "Do not replace the existing Streamlit dashboard or CLI.",
+        "Do not change existing command-line output or exit codes.",
+        "Do not change existing API routes or response schemas.",
+        "Do not change database schema or existing persistence behavior."
+      ],
+      "if_connection_requires_modifying_core": "Stop and explain the exact compatibility obstacle. Do not make core changes without explicit approval."
+    },
+    "architecture_instructions": {
+      "first_action": "Inspect the actual repository and verify the existing API, CLI arguments, result formats, authentication, and remediation interface before implementation. Do not infer undocumented endpoints or model fields.",
+      "preferred_integration_order": [
+        "Use existing authenticated API read endpoints for status, targets, history, incidents, and agents where those provide the needed information.",
+        "Use existing diagnosis/remediation.py recommendation function or public interface if confirmed by inspecting source.",
+        "For one-off checks, launch the existing CLI as a subprocess only if it is safe and supported; pass arguments as a list, never through shell=True.",
+        "If the existing API cannot expose a required operation and core changes are forbidden, use a separate adapter around existing supported interfaces or report the limitation instead of changing core."
+      ],
+      "new_addon_location": "ui_addon/",
+      "suggested_files": [
+        "ui_addon/app.py",
+        "ui_addon/services/api_client.py",
+        "ui_addon/services/terminal_runner.py",
+        "ui_addon/services/result_adapter.py",
+        "ui_addon/components/",
+        "ui_addon/README.md",
+        "tests/test_ui_addon.py"
+      ],
+      "technology": {
+        "preferred": "Streamlit, because the existing project already uses Streamlit",
+        "reuse_existing_dependencies": true,
+        "avoid_new_dependencies": true,
+        "if_a_new_dependency_is_essential": "Explain why before adding it; do not modify the existing requirements file unless explicitly approved. Prefer a separate addon requirements file if needed."
+      }
+    },
+    "ui_product_requirements": {
+      "design_direction": "Build a polished, responsive network operations dashboard with a dark, modern diagnostic-console aesthetic. Prioritize legibility and practical troubleshooting over decorative effects.",
+      "main_navigation": [
+        "Overview",
+        "Run Diagnostic",
+        "Issues & Solutions",
+        "History",
+        "Agents & Connection"
+      ],
+      "overview": [
+        "Display current overall health and the latest diagnostic timestamp.",
+        "Show summary metrics for healthy targets, failing targets, active incidents, and agent health when available.",
+        "Show a compact per-target status list with local/cloud observations where available.",
+        "Show recent incidents and recent checks.",
+        "Clearly distinguish unavailable data from a healthy result."
+      ],
+      "run_diagnostic": [
+        "Provide an input for an authorized HTTPS URL.",
+        "Expose only CLI options verified to exist in the source code.",
+        "Provide a Run Diagnostic action with progress and clear success/failure feedback.",
+        "Display the full captured stdout and stderr in a collapsible terminal-style panel without altering the original output.",
+        "Show process exit code and duration.",
+        "Never execute user-supplied text as a shell command."
+      ],
+      "issues_and_solutions": [
+        "List detected issues ordered by severity and recency where the existing data supports it.",
+        "For each issue, show the affected target, failing check, timestamp, evidence, and confidence.",
+        "Display the existing evidence-based remediation recommendations, if the implementation can be imported or retrieved without changing core files.",
+        "For each recommendation, show ordered steps, rationale, risk/admin warnings, and verification steps.",
+        "If recommendations cannot be retrieved, show a clear limitation message; do not invent a confirmed root cause.",
+        "Use separate labels for observed facts, likely causes, and unverified hypotheses."
+      ],
+      "history": [
+        "Display existing diagnostic history when available through the existing API or read-only supported interfaces.",
+        "Offer filtering by target, status, check type, and time only when supported by the available data.",
+        "Use existing history data; do not create a parallel database by default."
+      ],
+      "agents_and_connection": [
+        "Show local and cloud agent status, last heartbeat, and API connectivity if exposed by existing interfaces.",
+        "Display actionable connection errors without revealing tokens or other secrets.",
+        "Provide a connection test for the existing API base URL using the existing authentication configuration."
+      ]
+    },
+    "integration_contract": {
+      "api": {
+        "base_path": "/api/v1",
+        "existing_read_endpoints_to_verify": [
+          "GET /health",
+          "GET /ready",
+          "GET /api/v1/targets",
+          "GET /api/v1/status",
+          "GET /api/v1/agents",
+          "GET /api/v1/history",
+          "GET /api/v1/incidents",
+          "GET /api/v1/settings"
+        ],
+        "auth": "Use the existing API_TOKEN via server-side environment configuration. Never put bearer tokens in client-visible UI, browser code, logs, URLs, or error messages.",
+        "url_validation": "Use the project's existing URL validation rules or equivalent strict validation for HTTPS-only targets. Do not weaken SSRF or destination protections.",
+        "failure_behavior": "If API is unavailable, show an explicit disconnected state and retain access to features that can safely operate locally."
+      },
+      "cli_subprocess": {
+        "entry_point": "network_doctor.py",
+        "requirements": [
+          "Inspect the actual CLI parser and accepted arguments first.",
+          "Use subprocess with a list of arguments and shell=False.",
+          "Apply a finite timeout and terminate a hung process safely.",
+          "Capture stdout and stderr separately and display both faithfully.",
+          "Preserve the original exit code and do not rewrite the CLI's output.",
+          "Do not run commands outside the project executable/entry point.",
+          "Do not permit arbitrary command, executable, or argument injection."
+        ]
+      },
+      "terminal_output": {
+        "goal": "Show in the UI the same diagnostic output the existing CLI would show in the terminal.",
+        "preserve_exact_text": true,
+        "display": [
+          "stdout",
+          "stderr",
+          "exit code",
+          "elapsed time",
+          "start and completion timestamps"
+        ],
+        "streaming": "Only implement live streaming if it can be done reliably without changing the existing CLI. Otherwise capture output after completion and label it as completed output; do not simulate live streaming."
+      },
+      "recommendations": {
+        "source": "Existing diagnosis/remediation.py and existing diagnosis/result objects, after inspection",
+        "no_duplicate_logic": true,
+        "no_automatic_fixes": true,
+        "human_approval": "Any future feature that changes network, DNS, firewall, TLS, server, or cloud configuration requires explicit user approval and is out of scope for this UI addon."
+      }
+    },
+    "security_and_reliability": [
+      "Only support targets the operator owns or is authorized to monitor.",
+      "Never expose API_TOKEN, LOCAL_AGENT_TOKEN, CLOUD_AGENT_TOKEN, AGENT_TOKENS, database passwords, or notification secrets.",
+      "Never log environment variables or authentication headers.",
+      "Do not use shell=True for subprocess calls.",
+      "Do not disable TLS certificate verification.",
+      "Do not loosen cloud destination protections or allow private targets by default.",
+      "Set finite network and subprocess timeouts.",
+      "Handle API timeout, authentication failure, malformed response, and unavailable service gracefully.",
+      "Escape or safely render terminal output; do not interpret it as HTML or executable markup.",
+      "Use read-only access for dashboard/history data wherever possible.",
+      "Do not automatically restart services or modify network configuration."
+    ],
+    "implementation_steps": [
+      {
+        "step": 1,
+        "action": "Inspect the actual repository files and current project_details.json. Verify real API client patterns, authentication, CLI flags/output, diagnosis/remediation interfaces, and current Streamlit conventions.",
+        "success_criteria": "All integrations use verified existing interfaces; no guessed endpoints or data fields."
+      },
+      {
+        "step": 2,
+        "action": "Create a separate ui_addon/ application and supporting modules without editing existing project files.",
+        "success_criteria": "All feature implementation is in new files only, except tests in a new test file if needed."
+      },
+      {
+        "step": 3,
+        "action": "Implement a dashboard overview and API connection state using existing authenticated read endpoints.",
+        "success_criteria": "The UI accurately distinguishes connected, disconnected, stale, failing, and unknown states."
+      },
+      {
+        "step": 4,
+        "action": "Implement a one-off diagnostic page that safely invokes the existing CLI and shows unmodified stdout/stderr, exit code, and elapsed time.",
+        "success_criteria": "No shell execution, no arbitrary commands, finite timeout, and no change to CLI behavior."
+      },
+      {
+        "step": 5,
+        "action": "Implement an issues-and-solutions view that reuses the existing remediation logic and displays evidence, confidence, ordered actions, warnings, and verification steps.",
+        "success_criteria": "No duplicated or fabricated diagnosis logic; insufficient evidence is clearly identified."
+      },
+      {
+        "step": 6,
+        "action": "Add history and local/cloud agent visibility using only verified available data.",
+        "success_criteria": "No parallel database or core persistence changes."
+      },
+      {
+        "step": 7,
+        "action": "Add tests for API failures, missing fields, CLI timeout, stdout/stderr fidelity, exit-code preservation, secret redaction, and recommendation rendering.",
+        "success_criteria": "Tests do not require a real network or production credentials."
+      },
+      {
+        "step": 8,
+        "action": "Document separate addon launch instructions and configuration in ui_addon/README.md.",
+        "success_criteria": "The original CLI, API, agents, and existing dashboard remain independently runnable."
+      },
+      {
+        "step": 9,
+        "action": "Run addon tests and the existing test suite when the full repository is available. Report exact results and do not claim unrun tests passed.",
+        "success_criteria": "No regression to existing project behavior; all changes are additive."
+      }
+    ],
+    "launch_expectations": {
+      "separate_app": true,
+      "suggested_command": "python -m streamlit run ui_addon/app.py",
+      "note": "Confirm import paths and working-directory requirements from the real repository before finalizing this command. Do not alter the existing dashboard launch command."
+    },
+    "acceptance_criteria": [
+      "The UI is a separate addon and does not replace the existing dashboard.",
+      "Existing terminal diagnostics still work exactly as before.",
+      "The UI displays captured terminal output without modifying it.",
+      "The UI displays current network status and issues using existing system data.",
+      "The UI displays existing solution recommendations where available.",
+      "API/agent authentication and security protections remain intact.",
+      "No existing source files, API contracts, database schemas, or core behavior are changed.",
+      "The UI reports unavailable capabilities honestly instead of fabricating data.",
+      "The addon includes tests and a README with launch instructions."
+    ],
+    "instruction_to_coding_ai": "Implement this as a completely additive UI addon for Network Doctor. The user explicitly forbids changes to the existing project. Inspect the real repository first, then create new UI files that connect to the existing API, CLI, and remediation interface. The UI must show the same diagnostic output the terminal shows, identify issues, and present evidence-based solutions. If a requirement cannot be achieved through existing interfaces without editing core files, do not modify core; explain the limitation and ask for permission."
+  },
+  "notes": [
+    "An unsuccessful measurement is diagnostic evidence, not proof of a root cause.",
+    "ICMP may be blocked even when HTTPS is healthy.",
+    "Cloud target probing is independent of the local laptop, but the cloud agent needs an API connection to refresh its authorized target cache and upload results.",
+    "The file describes implemented project behavior and documented deployment paths; it does not contain credentials or live environment secrets."
+  ]
+}

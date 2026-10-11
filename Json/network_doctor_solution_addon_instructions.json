@@ -1,0 +1,58 @@
+{
+  "project": "Network Doctor",
+  "addon_name": "Network Doctor UI Addon",
+  "purpose": "Create a separate, additive diagnostics interface that reads the authenticated Network Doctor APIs and displays existing evidence-based recommendations without modifying the core project.",
+  "must_preserve": [
+    "Existing CLI behavior",
+    "Existing API contracts",
+    "Existing security controls",
+    "Existing database behavior",
+    "Existing dashboard and monitoring workflow"
+  ],
+  "allowed_changes": [
+    "Create new files under ui_addon/",
+    "Use the existing authenticated read APIs",
+    "Launch the existing CLI through subprocess without shell execution",
+    "Display evidence-based remediation recommendations from diagnosis/remediation.py",
+    "Add tests that validate the addon behavior"
+  ],
+  "forbidden_changes": [
+    "Do not edit existing core project source files for business logic",
+    "Do not bypass API auth or agent token checks",
+    "Do not disable TLS verification or loosen destination protections",
+    "Do not create a parallel database or mutate persistence state",
+    "Do not expose tokens, credentials, or secrets in logs or UI",
+    "Do not claim implementation success without verification"
+  ],
+  "launch_command": "python -m streamlit run ui_addon/app.py",
+  "required_files": [
+    "ui_addon/app.py",
+    "ui_addon/__init__.py",
+    "ui_addon/services/__init__.py",
+    "ui_addon/services/api_client.py",
+    "ui_addon/services/terminal_runner.py",
+    "ui_addon/services/result_adapter.py",
+    "ui_addon/README.md",
+    "tests/test_ui_addon.py"
+  ],
+  "api_contracts": [
+    "/health",
+    "/ready",
+    "/api/v1/status",
+    "/api/v1/agents",
+    "/api/v1/history",
+    "/api/v1/incidents",
+    "/api/v1/settings",
+    "/api/v1/targets"
+  ],
+  "recommended_behavior": [
+    "Show overview, run-diagnostic, issues-and-solutions, history, and connection views.",
+    "Display existing evidence-based remediation guidance with read-only steps, risk warnings, and verification instructions.",
+    "Handle missing API connectivity as a read-only disconnected mode without crashing the UI.",
+    "Use environment variables for API_BASE_URL and API_TOKEN and validate the base URL for secure loopback-only local use."
+  ],
+  "validation": [
+    "Run the full existing test suite with python -m pytest -q",
+    "Ensure the new addon tests pass and no core tests regress"
+  ]
+}
